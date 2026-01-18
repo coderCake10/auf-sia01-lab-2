@@ -1,2 +1,3 @@
 # auf-sia01-lab-2
-Lab 2 Activity using Vanilla PHP
+<<<<<<< HEAD
+Repository for Lab Activity 2 in SIA01
