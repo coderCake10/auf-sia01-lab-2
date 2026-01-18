@@ -1,70 +1,94 @@
-<?php
-    session_start();
-?>
+<?php 
+    include 'db.php'; 
+    session_start(); 
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registration Form</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="d-flex align-items-center justify-content-center vh-100" style="background-color: #fff3c2;">
+    if ($_SERVER['REQUEST_METHOD'] == 'POST') 
+    { 
+        $fullname = mysqli_real_escape_string($conn ,$_POST['fullname']); 
+        $email = mysqli_real_escape_string($conn ,$_POST['email']); 
+        $username = mysqli_real_escape_string($conn ,$_POST['username']); 
+        $password = mysqli_real_escape_string($conn ,$_POST['password']); 
+        $cpass = mysqli_real_escape_string($conn ,$_POST['cpass']); 
+        
+        //Password Validation 
+        
+        if ($password != $cpass)
+        { 
+            $_SESSION['error'] = "Passwords do not match";
+            header("Location: registration-form.php");
+            exit; 
+        } 
+        
+        $hashed_pass = password_hash($password, PASSWORD_DEFAULT); 
 
-    <div class="card shadow p-4" style="max-width: 400px; width: 100%;">
-        <div class="card-body">
-            <h3 class="card-title text-center mb-4">Register</h3>
+        //Check if username exists
 
-             <!--Allow users to enter their full name, email address, username, and password-->
-            <?php if (isset($_SESSION['error'])): ?>
-                <div class="alert alert-danger text-center" role="alert">
-                    <?= htmlspecialchars($_SESSION['error']) ?>
-                </div>
-            <?php
-                unset($_SESSION['error']);
-            endif;
-            ?>
+        $stmt = mysqli_prepare($conn, "SELECT id FROM users WHERE username = ?");
 
-            <form action="register.php" method="post">
-                
-                <div class="mb-3">
-                    <label for="fullname" class="form-label">Full Name</label>
-                    <input type="text" class="form-control" name="fullname" id="fullname" placeholder="John Doe" required>
-                </div>
+        mysqli_stmt_bind_param($stmt, "s", $username);
 
-                <div class="mb-3">
-                    <label for="email" class="form-label">Email Address</label>
-                    <input type="email" class="form-control" name="email" id="email" placeholder="name@example.com" required>
-                </div>
+        mysqli_stmt_execute($stmt);
 
-                <div class="mb-3">
-                    <label for="username" class="form-label">Username</label>
-                    <input type="text" class="form-control" name="username" id="username" required>
-                </div>
+        mysqli_stmt_store_result($stmt);
 
-                <div class="mb-3">
-                    <label for="password" class="form-label">Password</label>
-                    <input type="password" class="form-control" name="password" id="password" required>
-                </div>
+        if (mysqli_stmt_num_rows($stmt) > 0) 
+        {
+            $_SESSION['error'] = "Username already in use";
+            header("Location: registration-form.php");
+            exit;
+        }
 
-                <div class="mb-3">
-                    <label for="cpass" class="form-label">Confirm Password</label>
-                    <input type="password" class="form-control" name="cpass" id="cpass" required>
-                </div>
+        mysqli_stmt_close($stmt);
+        
+        //Check if email exists
 
-                <div class="d-grid gap-2">
-                    <input type="submit" class="btn btn-primary" value="Submit">
-                </div>
+        $stmt = mysqli_prepare($conn, "SELECT id FROM users WHERE email = ?");
 
-            </form>
+        mysqli_stmt_bind_param($stmt, "s", $email);
+
+        mysqli_stmt_execute($stmt);
+
+        mysqli_stmt_store_result($stmt);
+
+        if (mysqli_stmt_num_rows($stmt) > 0) 
+        {
+            $_SESSION['error'] = "Email already in use";
+            header("Location: registration-form.php");
+            exit;
+        }
+
+        mysqli_stmt_close($stmt);    
+        
+        //Inserting to database 
+        try
+        {
+            $stmt = mysqli_prepare($conn,"INSERT INTO users (email, username, passwd, fullname) 
+                                                        VALUES (?, ?, ?, ?)");
+                    
+            mysqli_stmt_bind_param( $stmt, "ssss", $email, $username, $hashed_pass, $fullname );
             
-            <div class="mt-3 text-center">
-                <small>Already have an account? <a href="login-form.php">Login here</a></small>
-            </div>
-        </div>
-    </div>
+            if (mysqli_stmt_execute($stmt)) 
+            { 
+                error_log("REGISTRATION_SUCCESS: New user '$username' registered with email '$email'");
+                $_SESSION['success'] = "Account created successfully. You may now log in."; 
+                header("Location: login-form.php"); 
+                exit; 
+            } 
+            else 
+            { 
+                $_SESSION['error'] = "Registration failed. Please try again.";
+                header("Location: registration-form.php"); 
+                exit; 
+            }
+        }
+        catch (mysqli_sql_exception $e)
+        {
+            error_log("DATABASE ERROR: " . $e->getMessage());
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+            $_SESSION['error'] = "Error occured. Please try again later.";
+            header("Location: login-form.php");
+            exit;
+        }
+         
+    } 
+?>
